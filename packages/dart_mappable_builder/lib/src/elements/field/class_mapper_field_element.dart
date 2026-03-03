@@ -117,29 +117,70 @@ class ClassMapperFieldElement extends MapperFieldElement {
 
   @override
   late final Future<String> def = () async {
-    if (param == null) return '';
-
-    var p = param!.parameter;
-    if (p == null) {
-      return '';
-    }
-
-    var node = await p.getResolvedNode();
-    if (node is DefaultFormalParameter &&
-        node.defaultValue.toString() != 'null') {
-      if (node.defaultValue case SimpleIdentifier(
-        element: PropertyAccessorElement(enclosingElement: ClassElement clazz),
-        name: String name,
-      )) {
-        return ', def: ${clazz.name}.$name';
+    String? defaultValue;
+    if (param != null) {
+      var p = param!.parameter;
+      if (p != null) {
+        var node = await p.getResolvedNode();
+        if (node is DefaultFormalParameter &&
+            node.defaultValue.toString() != 'null') {
+          if (node.defaultValue case SimpleIdentifier(
+            element: PropertyAccessorElement(enclosingElement: ClassElement clazz),
+            name: String name,
+          )) {
+            defaultValue = '${clazz.name}.$name';
+          } else {
+            defaultValue = node.defaultValue?.toSource();
+          }
+        } else if (p.hasDefaultValue && p.defaultValueCode != 'null') {
+          defaultValue = p.defaultValueCode;
+        }
       }
-      return ', def: ${node.defaultValue?.toSource()}';
-    } else if (p.hasDefaultValue && p.defaultValueCode != 'null') {
-      return ', def: ${p.defaultValueCode}';
     }
 
-    return '';
+    if (defaultValue == null &&
+        parent.options.useGlobalDefaultsOnMissing == true &&
+        !resolvedType.isNullable &&
+        !(param?.isOptional ?? false)) {
+      var typeName = resolvedType.getDisplayString(withNullability: false);
+      var defaults = parent.options.globalDefaults;
+
+      if (defaults != null) {
+        if (defaults.containsKey(typeName)) {
+          defaultValue = _formatValue(defaults[typeName]);
+        } else if (resolvedType is InterfaceType) {
+          var it = resolvedType as InterfaceType;
+          if (it.element.name == 'List' && it.element.library.isDartCore) {
+            if (defaults.containsKey('List')) {
+              defaultValue = _formatValue(defaults['List']);
+            }
+          } else if (it.element.name == 'Map' && it.element.library.isDartCore) {
+            if (defaults.containsKey('Map')) {
+              defaultValue = _formatValue(defaults['Map']);
+            }
+          } else if (it.element.name == 'Set' && it.element.library.isDartCore) {
+            if (defaults.containsKey('Set')) {
+              defaultValue = _formatValue(defaults['Set']);
+            }
+          }
+        }
+      }
+    }
+
+    return defaultValue != null ? ', def: $defaultValue' : '';
   }();
+
+  String _formatValue(dynamic val) {
+    if (val is String) {
+      return "r'$val'";
+    } else if (val is List) {
+      return '[${val.map(_formatValue).join(', ')}]';
+    } else if (val is Map) {
+      return '{${val.entries.map((e) => "${_formatValue(e.key)}: ${_formatValue(e.value)}").join(', ')}}';
+    } else {
+      return val.toString();
+    }
+  }
 
   @override
   late final Future<String> hook = () async {

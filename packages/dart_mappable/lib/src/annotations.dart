@@ -228,6 +228,8 @@ class MappableLib {
     this.discriminatorKey,
     this.generateMethods,
     this.generateInitializerForScope,
+    this.useGlobalDefaultsOnMissing,
+    this.globalDefaults,
   });
 
   /// The case style for the map keys.
@@ -248,6 +250,13 @@ class MappableLib {
   /// Will generated a new [<filename>.init.dart] file with an initializer
   /// method that automatically registers all mappers in the scope.
   final InitializerScope? generateInitializerForScope;
+
+  /// If true, use global defaults instead of throwing MapperException
+  /// when a required field is missing.
+  final bool? useGlobalDefaultsOnMissing;
+
+  /// The default values to use for specific types.
+  final Map<String, dynamic>? globalDefaults;
 }
 
 /// The scope of mappers that should automatically be registered when using

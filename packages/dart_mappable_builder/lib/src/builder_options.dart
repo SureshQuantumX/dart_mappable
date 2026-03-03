@@ -17,6 +17,8 @@ class MappableOptions {
   final InitializerScope? initializerScope;
   final Map<String, String> renameMethods;
   final Map<String, List<String>> buildExtensions;
+  final bool? useGlobalDefaultsOnMissing;
+  final Map<String, dynamic>? globalDefaults;
 
   MappableOptions({
     this.caseStyle,
@@ -27,6 +29,8 @@ class MappableOptions {
     this.initializerScope,
     this.renameMethods = const {},
     this.buildExtensions = _defaultExtensions,
+    this.useGlobalDefaultsOnMissing,
+    this.globalDefaults,
   });
 
   MappableOptions.parse(Map options)
@@ -42,7 +46,9 @@ class MappableOptions {
       buildExtensions = validatedBuildExtensionsFrom(
         options,
         _defaultExtensions,
-      );
+      ),
+      useGlobalDefaultsOnMissing = options['useGlobalDefaultsOnMissing'] as bool?,
+      globalDefaults = toMap(options['globalDefaults'] ?? {});
 
   MappableOptions apply(MappableOptions? options, {bool forceJoin = true}) {
     if (options == null) return this;
@@ -55,6 +61,9 @@ class MappableOptions {
       generateMethods: options.generateMethods ?? generateMethods,
       initializerScope: options.initializerScope ?? initializerScope,
       renameMethods: {...renameMethods, ...options.renameMethods},
+      useGlobalDefaultsOnMissing:
+          options.useGlobalDefaultsOnMissing ?? useGlobalDefaultsOnMissing,
+      globalDefaults: {...?globalDefaults, ...?options.globalDefaults},
     );
   }
 
@@ -71,8 +80,31 @@ class MappableOptions {
               ? null
               : InitializerScope
                   .values[initScope?.read('index')?.toIntValue() ?? 0],
+      useGlobalDefaultsOnMissing:
+          object.read('useGlobalDefaultsOnMissing')?.toBoolValue(),
+      globalDefaults: object
+          .read('globalDefaults')
+          ?.toMapValue()
+          ?.map((k, v) => MapEntry(k!.toStringValue()!, _toValue(v))),
     );
   }
+}
+
+dynamic _toValue(DartObject? obj) {
+  if (obj == null || obj.isNull) return null;
+  if (obj.toBoolValue() != null) return obj.toBoolValue();
+  if (obj.toIntValue() != null) return obj.toIntValue();
+  if (obj.toDoubleValue() != null) return obj.toDoubleValue();
+  if (obj.toStringValue() != null) return obj.toStringValue();
+  if (obj.toListValue() != null) {
+    return obj.toListValue()!.map(_toValue).toList();
+  }
+  if (obj.toMapValue() != null) {
+    return obj
+        .toMapValue()!
+        .map((k, v) => MapEntry(k!.toStringValue()!, _toValue(v)));
+  }
+  return null;
 }
 
 int? parseGenerateMethods(List<String>? flags) {
