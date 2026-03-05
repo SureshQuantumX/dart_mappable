@@ -373,7 +373,7 @@ var constants = element.fields.where((f) => f.isEnumConstant).toList();
 
 if (constants.isEmpty) return null;
 
-var fallbackName = parent.options.enumFallbackValue ?? 'none';
+var fallbackName = parent.options.enumMissingValue ?? 'none';
 
 var preferredConstant = constants.where((f) => f.name == fallbackName).firstOrNull;
 

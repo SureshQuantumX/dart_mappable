@@ -610,11 +610,11 @@ void main() {
       );
     });
 
-    test('uses configurable enumFallbackValue from build.yaml', () async {
+    test('uses configurable enumMissingValue from build.yaml', () async {
       var options = {
         'useGlobalDefaultsOnMissing': true,
         'globalDefaults': {'String': '-'},
-        'enumFallbackValue': 'unknown',
+        'enumMissingValue': 'unknown',
       };
 
       final reader = TestReaderWriter(rootPackage: 'models');
@@ -688,11 +688,11 @@ void main() {
       );
     });
 
-    test('falls back to first constant when enumFallbackValue not found', () async {
+    test('falls back to first constant when enumMissingValue not found', () async {
       var options = {
         'useGlobalDefaultsOnMissing': true,
         'globalDefaults': {'String': '-'},
-        'enumFallbackValue': 'unknown',
+        'enumMissingValue': 'unknown',
       };
 
       final reader = TestReaderWriter(rootPackage: 'models');
@@ -789,10 +789,57 @@ void main() {
       );
     });
 
+    test('enumMissingValue and enumFallbackValue work independently', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-'},
+        'enumMissingValue': 'none',
+        'enumFallbackValue': 'unknown',
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            @MappableEnum()
+            enum MfType { none, unknown, lumpsum, sip, redemption }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final String name;
+              final MfType mfType;
+
+              Model(this.name, this.mfType);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            allOf([
+              // Missing field default uses enumMissingValue ('none')
+              contains('def: MfType.none'),
+              // Unknown value decoder uses enumFallbackValue ('unknown') — index 1
+              contains('return MfType.values[1]'),
+              isNot(contains('throw MapperException.unknownEnumValue')),
+            ]),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
     test('full scenario: snakeCase + enums + custom class with named params', () async {
       var options = {
         'caseStyle': 'snakeCase',
         'useGlobalDefaultsOnMissing': true,
+        'enumMissingValue': 'unknown',
         'enumFallbackValue': 'unknown',
         'globalDefaults': {
           'String': '-',
