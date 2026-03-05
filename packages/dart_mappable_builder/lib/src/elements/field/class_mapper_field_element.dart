@@ -248,55 +248,11 @@ parent.options.useGlobalDefaultsOnMissing == true &&
 
 !(param?.isOptional ?? false)) {
 
-var typeName = resolvedType.getDisplayString(withNullability: false);
-
 var defaults = parent.options.globalDefaults;
 
 if (defaults != null) {
 
-if (defaults.containsKey(typeName)) {
-
-defaultValue = _formatValue(defaults[typeName]);
-
-} else if (resolvedType is InterfaceType) {
-
-var it = resolvedType as InterfaceType;
-
-if (it.element.name == 'List' && it.element.library.isDartCore) {
-
-if (defaults.containsKey('List')) {
-
-defaultValue = _formatValue(defaults['List']);
-
-}
-
-} else if (it.element.name == 'Map' && it.element.library.isDartCore) {
-
-if (defaults.containsKey('Map')) {
-
-defaultValue = _formatValue(defaults['Map']);
-
-}
-
-} else if (it.element.name == 'Set' && it.element.library.isDartCore) {
-
-if (defaults.containsKey('Set')) {
-
-defaultValue = _formatValue(defaults['Set']);
-
-}
-
-} else if (classChecker.hasAnnotationOf(it.element)) {
-
-defaultValue = _buildCustomClassDefault(it, defaults);
-
-} else if (it.element is EnumElement) {
-
-defaultValue = _buildEnumDefault(it);
-
-}
-
-}
+defaultValue = _resolveDefaultForType(resolvedType, defaults);
 
 }
 
@@ -305,6 +261,46 @@ defaultValue = _buildEnumDefault(it);
 return defaultValue != null ? ', def: $defaultValue' : '';
 
 }();
+
+String? _resolveDefaultForType(DartType type, Map<String, dynamic> defaults) {
+
+var typeName = type.getDisplayString();
+
+if (defaults.containsKey(typeName)) {
+
+return _formatValue(defaults[typeName]);
+
+}
+
+if (type is InterfaceType) {
+
+if (type.element.name == 'List' && type.element.library.isDartCore) {
+
+return defaults.containsKey('List') ? _formatValue(defaults['List']) : null;
+
+} else if (type.element.name == 'Map' && type.element.library.isDartCore) {
+
+return defaults.containsKey('Map') ? _formatValue(defaults['Map']) : null;
+
+} else if (type.element.name == 'Set' && type.element.library.isDartCore) {
+
+return defaults.containsKey('Set') ? _formatValue(defaults['Set']) : null;
+
+} else if (classChecker.hasAnnotationOf(type.element)) {
+
+return _buildCustomClassDefault(type, defaults);
+
+} else if (type.element is EnumElement) {
+
+return _buildEnumDefault(type);
+
+}
+
+}
+
+return null;
+
+}
 
 String? _buildCustomClassDefault(
 
@@ -323,14 +319,13 @@ ctor = element.unnamedConstructor;
 }
 
 if (ctor == null) return null;
+if (!ctor.isConst) return null;
 
 var args = <String>[];
 
 for (var param in ctor.formalParameters) {
 
 var paramType = param.type;
-
-var paramTypeName = paramType.getDisplayString(withNullability: false);
 
 if (paramType.isNullable || (!param.isRequired && param.isOptional)) {
 
@@ -340,39 +335,7 @@ continue;
 
 }
 
-String? value;
-
-if (defaults.containsKey(paramTypeName)) {
-
-value = _formatValue(defaults[paramTypeName]);
-
-} else if (paramType is InterfaceType) {
-
-var pt = paramType;
-
-if (pt.element.name == 'List' && pt.element.library.isDartCore) {
-
-if (defaults.containsKey('List')) value = _formatValue(defaults['List']);
-
-} else if (pt.element.name == 'Map' && pt.element.library.isDartCore) {
-
-if (defaults.containsKey('Map')) value = _formatValue(defaults['Map']);
-
-} else if (pt.element.name == 'Set' && pt.element.library.isDartCore) {
-
-if (defaults.containsKey('Set')) value = _formatValue(defaults['Set']);
-
-} else if (classChecker.hasAnnotationOf(pt.element)) {
-
-value = _buildCustomClassDefault(pt, defaults);
-
-} else if (pt.element is EnumElement) {
-
-value = _buildEnumDefault(pt);
-
-}
-
-}
+var value = _resolveDefaultForType(paramType, defaults);
 
 if (value == null) {
 

@@ -789,5 +789,85 @@ void main() {
         readerWriter: reader,
       );
     });
+
+    test('full scenario: snakeCase + enums + custom class with named params', () async {
+      var options = {
+        'caseStyle': 'snakeCase',
+        'useGlobalDefaultsOnMissing': true,
+        'enumFallbackValue': 'unknown',
+        'globalDefaults': {
+          'String': '-',
+          'int': 0,
+          'double': 0.0,
+          'bool': false,
+          'num': 0,
+          'List': [],
+          'Map': {},
+        },
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            @MappableClass()
+            class UserData with UserDataMappable {
+              final String userId;
+              final String dummyValue;
+
+              const UserData({
+                required this.userId,
+                required this.dummyValue,
+              });
+            }
+
+            enum FrontendOrderStatus { unknown, placed, confirmed, rejected }
+
+            enum MfType { unknown, lumpsum, sip, redemption }
+
+            @MappableClass()
+            class MfOrdersData with MfOrdersDataMappable {
+              final String schemeName;
+              final double amount;
+              final FrontendOrderStatus frontendStatus;
+              final MfType mfType;
+              final String userId;
+              final num dummyValue;
+              final UserData userData;
+
+              const MfOrdersData({
+                required this.schemeName,
+                required this.amount,
+                required this.frontendStatus,
+                required this.mfType,
+                required this.userId,
+                required this.dummyValue,
+                required this.userData,
+              });
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            allOf([
+              contains("def: r'-'"),
+              contains('def: 0.0'),
+              contains('def: FrontendOrderStatus.unknown'),
+              contains('def: MfType.unknown'),
+              contains('def: 0'),
+              contains("def: const UserData(userId: r'-', dummyValue: r'-')"),
+            ]),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
   });
 }
