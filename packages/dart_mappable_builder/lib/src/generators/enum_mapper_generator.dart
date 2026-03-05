@@ -1,3 +1,5 @@
+import 'package:build/build.dart';
+
 import '../elements/enum/target_enum_mapper_element.dart';
 import 'generator.dart';
 
@@ -10,7 +12,7 @@ class EnumMapperGenerator extends MapperGenerator<TargetEnumMapperElement> {
     return '''
         class ${element.mapperName} extends EnumMapper<${element.prefixedClassName}> {
           ${element.mapperName}._();
-          
+
           static ${element.mapperName}? _instance;
           static ${element.mapperName} ensureInitialized() {
             if (_instance == null) {
@@ -18,12 +20,12 @@ class EnumMapperGenerator extends MapperGenerator<TargetEnumMapperElement> {
             }
             return _instance!;
           }
-          
+
           static ${element.prefixedClassName} fromValue(dynamic value) {
             ensureInitialized();
             return MapperContainer.globals.fromValue(value);
           }
-          
+
           @override
           ${element.prefixedClassName} decode(dynamic value) {
             switch (value) {
@@ -31,7 +33,7 @@ class EnumMapperGenerator extends MapperGenerator<TargetEnumMapperElement> {
               default: ${_generateDefaultCase()}
             }
           }
-          
+
           @override
           dynamic encode(${element.prefixedClassName} self) {
             switch (self) {
@@ -39,7 +41,7 @@ class EnumMapperGenerator extends MapperGenerator<TargetEnumMapperElement> {
             }
           }
         }
-        
+
         extension ${element.mapperName}Extension on ${element.prefixedClassName} {
           ${element.hasAllStringValues ? 'String' : 'dynamic'} toValue() {
             ${element.mapperName}.ensureInitialized();
@@ -59,10 +61,9 @@ class EnumMapperGenerator extends MapperGenerator<TargetEnumMapperElement> {
       if (match != -1) {
         return 'return ${element.prefixedClassName}.values[$match];';
       }
-      print(
-        '[WARNING] Enum \'${element.className}\' does not have a \'$fallbackName\' value. '
-        'Add \'${element.className}.$fallbackName\' to handle unknown values gracefully, '
-        'otherwise the mapper will throw on unrecognized values.',
+      log.warning(
+        'Enum \'${element.className}\' does not have a \'$fallbackName\' value. '
+        'Add \'${element.className}.$fallbackName\' to handle unknown values gracefully.',
       );
     }
     return 'throw MapperException.unknownEnumValue(value);';
