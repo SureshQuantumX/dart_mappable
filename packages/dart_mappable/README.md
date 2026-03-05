@@ -252,7 +252,8 @@ targets:
       dart_mappable_builder:
         options:
           useGlobalDefaultsOnMissing: true
-          enumFallbackValue: 'none'  # optional: preferred enum constant name
+          enumMissingValue: 'none'     # default enum constant when field is missing from JSON
+          enumFallbackValue: 'unknown' # fallback enum constant when JSON value is unknown
           globalDefaults:
             String: ""
             int: 0
@@ -270,7 +271,8 @@ Alternatively, configure defaults per-library using the annotation:
 ```dart
 @MappableLib(
   useGlobalDefaultsOnMissing: true,
-  enumFallbackValue: 'none',
+  enumMissingValue: 'none',
+  enumFallbackValue: 'unknown',
   globalDefaults: {
     'String': '',
     'int': 0,
@@ -292,7 +294,7 @@ The builder resolves defaults for each **required, non-nullable** field using th
 | Has explicit default in constructor (`{this.a = 'x'}`) | Uses that value (highest priority) |
 | Primitive (`String`, `int`, `double`, `bool`, `num`) | From `globalDefaults` config |
 | `List`, `Map`, `Set` | From `globalDefaults` config |
-| Enum | Prefers constant named by `enumFallbackValue` (default: `none`), otherwise first constant |
+| Enum | Prefers constant named by `enumMissingValue` (default: `none`), otherwise first constant |
 | `@MappableClass` type | Recursively builds a `const` constructor using defaults for each required param |
 | Nullable (`String?`, `int?`, etc.) | `null` - no config needed |
 | Other types (`DateTime`, `Uri`, etc.) | No default generated - make these nullable or provide an explicit default |
@@ -300,7 +302,8 @@ The builder resolves defaults for each **required, non-nullable** field using th
 ### Example
 
 ```dart
-enum Status { none, active, inactive }
+@MappableEnum()
+enum Status { none, unknown, active, inactive }
 
 @MappableClass()
 class UserData with UserDataMappable {
@@ -331,26 +334,56 @@ class Order with OrderMappable {
 With the configuration above, if the backend sends incomplete JSON:
 
 ```dart
+// Missing field — uses enumMissingValue ('none')
 final json = {'id': 'ORD-1', 'amount': 500.0};
 final order = OrderMapper.fromMap(json);
-
-// order.id == 'ORD-1'                           (from JSON)
-// order.amount == 500.0                          (from JSON)
-// order.status == Status.none                    (enum fallback)
-// order.cancelReason == null                     (nullable)
+// order.status == Status.none                     (field missing → enumMissingValue)
 // order.userData == UserData(userId: '', name: '') (recursive const default)
+
+// Unknown value — uses enumFallbackValue ('unknown')
+final json2 = {'id': 'ORD-2', 'amount': 300.0, 'status': 'archived'};
+final order2 = OrderMapper.fromMap(json2);
+// order2.status == Status.unknown                 (value unrecognized → enumFallbackValue)
 ```
 
-### `enumFallbackValue` option
+### Enum options
 
-Controls which enum constant name is preferred as the default:
+There are two separate options for handling enums in different scenarios:
+
+#### `enumMissingValue` — field missing from JSON
+
+Controls which enum constant to use when a required enum field is **absent** from the JSON:
 
 ```yaml
-enumFallbackValue: 'none'     # prefers MyEnum.none if it exists
-enumFallbackValue: 'unknown'  # prefers MyEnum.unknown if it exists
+enumMissingValue: 'none'     # uses MyEnum.none if it exists (default)
+enumMissingValue: 'unknown'  # uses MyEnum.unknown if it exists
 ```
 
 If the specified constant doesn't exist in a particular enum, the first declared constant is used.
+
+#### `enumFallbackValue` — unknown value in JSON
+
+Controls which enum constant to use when the JSON contains a value that **doesn't match** any
+enum constant (e.g., receiving `"nfo"` when the enum only has `lumpsum`, `sip`, etc.):
+
+```yaml
+enumFallbackValue: 'unknown'  # uses MyEnum.unknown for unrecognized values
+```
+
+If the specified constant doesn't exist in a particular enum, a build warning is emitted and
+decoding will throw a `MapperException` for unknown values.
+
+#### Example with both options
+
+```dart
+@MappableEnum()
+enum MfType { none, unknown, lumpsum, sip, redemption }
+```
+
+```yaml
+enumMissingValue: 'none'      # {"amount": 100} (no mfType key) → MfType.none
+enumFallbackValue: 'unknown'   # {"mfType": "nfo"} (unrecognized)  → MfType.unknown
+```
 
 ## Full Documentation
 
