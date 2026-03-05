@@ -301,8 +301,8 @@ void main() {
             @MappableClass()
             class NoDefault with NoDefaultMappable {
               final String name;
-              final DateTime created;
-              NoDefault(this.name, this.created);
+              final Uri uri;
+              NoDefault(this.name, this.uri);
             }
 
             @MappableClass()
@@ -317,7 +317,7 @@ void main() {
             'models|lib/model.mapper.dart': decoded(
               allOf([
                 contains("def: r'-'"),
-                // NoDefault can't be auto-generated because DateTime has no global default
+                // NoDefault can't be auto-generated because Uri has no global default
                 isNot(contains('def: const NoDefault')),
               ]),
             ),
@@ -400,6 +400,327 @@ void main() {
               contains('opt: true'),
               contains("def: 'explicit'"),
             ]),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
+    test('generates default for enum types using first value', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-'},
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            enum Status { active, inactive, pending }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final String name;
+              final Status status;
+
+              Model(this.name, this.status);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            allOf([
+              contains("def: r'-'"),
+              contains('def: Status.active'),
+            ]),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
+    test('generates enum default inside custom class default', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-', 'int': 0},
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            enum Priority { low, medium, high }
+
+            @MappableClass()
+            class Task with TaskMappable {
+              final String title;
+              final Priority priority;
+
+              Task({required this.title, required this.priority});
+            }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final Task task;
+
+              Model(this.task);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            contains("def: const Task(title: r'-', priority: Priority.low)"),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
+    test('prefers none enum value as default when available', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-'},
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            enum Status { none, active, inactive }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final String name;
+              final Status status;
+
+              Model(this.name, this.status);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            contains('def: Status.none'),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
+    test('prefers none enum value inside custom class default', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-'},
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            enum Priority { none, low, medium, high }
+
+            @MappableClass()
+            class Config with ConfigMappable {
+              final String label;
+              final Priority priority;
+
+              Config({required this.label, required this.priority});
+            }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final Config config;
+
+              Model(this.config);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            contains(
+              "def: const Config(label: r'-', priority: Priority.none)",
+            ),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
+    test('skips DateTime fields (no const constructor)', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-'},
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final String name;
+              final DateTime createdAt;
+
+              Model(this.name, this.createdAt);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            allOf([
+              contains("def: r'-'"),
+              isNot(contains('def: DateTime')),
+            ]),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
+    test('uses configurable enumFallbackValue from build.yaml', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-'},
+        'enumFallbackValue': 'unknown',
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            enum Status { active, unknown, inactive }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final String name;
+              final Status status;
+
+              Model(this.name, this.status);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            contains('def: Status.unknown'),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
+    test('skips nullable enum fields', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-'},
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            enum Status { active, inactive }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final String name;
+              final Status? status;
+
+              Model(this.name, this.status);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            allOf([
+              contains("def: r'-'"),
+              isNot(contains('def: Status')),
+            ]),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
+    test('falls back to first constant when enumFallbackValue not found', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-'},
+        'enumFallbackValue': 'unknown',
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            enum Status { active, inactive, pending }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final String name;
+              final Status status;
+
+              Model(this.name, this.status);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            contains('def: Status.active'),
           ),
         },
         readerWriter: reader,

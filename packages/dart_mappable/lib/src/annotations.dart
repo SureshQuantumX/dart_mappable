@@ -230,6 +230,7 @@ class MappableLib {
     this.generateInitializerForScope,
     this.useGlobalDefaultsOnMissing,
     this.globalDefaults,
+    this.enumFallbackValue,
   });
 
   /// The case style for the map keys.
@@ -257,6 +258,11 @@ class MappableLib {
 
   /// The default values to use for specific types.
   final Map<String, dynamic>? globalDefaults;
+
+  /// The preferred enum constant name to use as the default value when a
+  /// required enum field is missing. If the enum has a constant with this name,
+  /// it will be used. Otherwise falls back to the first constant.
+  final String? enumFallbackValue;
 }
 
 /// The scope of mappers that should automatically be registered when using

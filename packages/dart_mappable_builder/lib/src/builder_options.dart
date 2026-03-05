@@ -19,6 +19,7 @@ class MappableOptions {
   final Map<String, List<String>> buildExtensions;
   final bool? useGlobalDefaultsOnMissing;
   final Map<String, dynamic>? globalDefaults;
+  final String? enumFallbackValue;
 
   MappableOptions({
     this.caseStyle,
@@ -31,6 +32,7 @@ class MappableOptions {
     this.buildExtensions = _defaultExtensions,
     this.useGlobalDefaultsOnMissing,
     this.globalDefaults,
+    this.enumFallbackValue,
   });
 
   MappableOptions.parse(Map options)
@@ -48,7 +50,8 @@ class MappableOptions {
         _defaultExtensions,
       ),
       useGlobalDefaultsOnMissing = options['useGlobalDefaultsOnMissing'] as bool?,
-      globalDefaults = toMap(options['globalDefaults'] ?? {});
+      globalDefaults = toMap(options['globalDefaults'] ?? {}),
+      enumFallbackValue = options['enumFallbackValue'] as String?;
 
   MappableOptions apply(MappableOptions? options, {bool forceJoin = true}) {
     if (options == null) return this;
@@ -64,6 +67,7 @@ class MappableOptions {
       useGlobalDefaultsOnMissing:
           options.useGlobalDefaultsOnMissing ?? useGlobalDefaultsOnMissing,
       globalDefaults: {...?globalDefaults, ...?options.globalDefaults},
+      enumFallbackValue: options.enumFallbackValue ?? enumFallbackValue,
     );
   }
 
@@ -86,6 +90,8 @@ class MappableOptions {
           .read('globalDefaults')
           ?.toMapValue()
           ?.map((k, v) => MapEntry(k!.toStringValue()!, _toValue(v))),
+      enumFallbackValue:
+          object.read('enumFallbackValue')?.toStringValue(),
     );
   }
 }

@@ -290,6 +290,10 @@ defaultValue = _formatValue(defaults['Set']);
 
 defaultValue = _buildCustomClassDefault(it, defaults);
 
+} else if (it.element is EnumElement) {
+
+defaultValue = _buildEnumDefault(it);
+
 }
 
 }
@@ -362,6 +366,10 @@ if (defaults.containsKey('Set')) value = _formatValue(defaults['Set']);
 
 value = _buildCustomClassDefault(pt, defaults);
 
+} else if (pt.element is EnumElement) {
+
+value = _buildEnumDefault(pt);
+
 }
 
 }
@@ -389,6 +397,28 @@ args.add(value);
 var className = parent.parent.prefixedType(type, withNullability: false);
 
 return 'const $className(${args.join(', ')})';
+
+}
+
+String? _buildEnumDefault(InterfaceType type) {
+
+var element = type.element;
+
+if (element is! EnumElement) return null;
+
+var constants = element.fields.where((f) => f.isEnumConstant).toList();
+
+if (constants.isEmpty) return null;
+
+var fallbackName = parent.options.enumFallbackValue ?? 'none';
+
+var preferredConstant = constants.where((f) => f.name == fallbackName).firstOrNull;
+
+var chosen = preferredConstant ?? constants.first;
+
+var className = parent.parent.prefixedType(type, withNullability: false);
+
+return '$className.${chosen.name}';
 
 }
 

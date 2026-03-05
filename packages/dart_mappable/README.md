@@ -235,6 +235,123 @@ The generated `<ClassName>Mappable` mixin will come with the following methods:
 - `copyWith()` to create copies of your class instance (see [Copy With](https://pub.dev/documentation/dart_mappable/latest/topics/Copy-With-topic.html)).
 - overrides for `operator ==`, `hashCode` and `toString()`.
 
+## Global Defaults
+
+When working with backend APIs, required fields may sometimes be missing from the JSON response.
+By default, this causes a `MapperException`. The **global defaults** feature lets you configure
+fallback values so that missing fields are filled in automatically instead of throwing.
+
+### Configuration via `build.yaml`
+
+Add the following to your project's `build.yaml`:
+
+```yaml
+targets:
+  $default:
+    builders:
+      dart_mappable_builder:
+        options:
+          useGlobalDefaultsOnMissing: true
+          enumFallbackValue: 'none'  # optional: preferred enum constant name
+          globalDefaults:
+            String: ""
+            int: 0
+            double: 0.0
+            num: 0
+            bool: false
+            List: []
+            Map: {}
+```
+
+### Configuration via `@MappableLib` annotation
+
+Alternatively, configure defaults per-library using the annotation:
+
+```dart
+@MappableLib(
+  useGlobalDefaultsOnMissing: true,
+  enumFallbackValue: 'none',
+  globalDefaults: {
+    'String': '',
+    'int': 0,
+    'double': 0.0,
+    'bool': false,
+  },
+)
+library;
+
+import 'package:dart_mappable/dart_mappable.dart';
+```
+
+### How defaults are resolved
+
+The builder resolves defaults for each **required, non-nullable** field using this order:
+
+| Field type | Default value |
+|---|---|
+| Has explicit default in constructor (`{this.a = 'x'}`) | Uses that value (highest priority) |
+| Primitive (`String`, `int`, `double`, `bool`, `num`) | From `globalDefaults` config |
+| `List`, `Map`, `Set` | From `globalDefaults` config |
+| Enum | Prefers constant named by `enumFallbackValue` (default: `none`), otherwise first constant |
+| `@MappableClass` type | Recursively builds a `const` constructor using defaults for each required param |
+| Nullable (`String?`, `int?`, etc.) | `null` - no config needed |
+| Other types (`DateTime`, `Uri`, etc.) | No default generated - make these nullable or provide an explicit default |
+
+### Example
+
+```dart
+enum Status { none, active, inactive }
+
+@MappableClass()
+class UserData with UserDataMappable {
+  final String userId;
+  final String name;
+
+  const UserData({required this.userId, required this.name});
+}
+
+@MappableClass()
+class Order with OrderMappable {
+  final String id;
+  final double amount;
+  final Status status;        // non-nullable enum
+  final Status? cancelReason; // nullable - defaults to null
+  final UserData userData;    // nested custom class
+
+  const Order({
+    required this.id,
+    required this.amount,
+    required this.status,
+    this.cancelReason,
+    required this.userData,
+  });
+}
+```
+
+With the configuration above, if the backend sends incomplete JSON:
+
+```dart
+final json = {'id': 'ORD-1', 'amount': 500.0};
+final order = OrderMapper.fromMap(json);
+
+// order.id == 'ORD-1'                           (from JSON)
+// order.amount == 500.0                          (from JSON)
+// order.status == Status.none                    (enum fallback)
+// order.cancelReason == null                     (nullable)
+// order.userData == UserData(userId: '', name: '') (recursive const default)
+```
+
+### `enumFallbackValue` option
+
+Controls which enum constant name is preferred as the default:
+
+```yaml
+enumFallbackValue: 'none'     # prefers MyEnum.none if it exists
+enumFallbackValue: 'unknown'  # prefers MyEnum.unknown if it exists
+```
+
+If the specified constant doesn't exist in a particular enum, the first declared constant is used.
+
 ## Full Documentation
 
 See the full documentation [here](https://pub.dev/documentation/dart_mappable/latest/topics/Introduction-topic.html)

@@ -81,6 +81,106 @@ global_options:
       generateMethods: [decode, encode, copy, stringify, equals]
 ```
 
+### Global Defaults for Missing Fields
+
+When a required, non-nullable field is missing from the decoded JSON, `dart_mappable` normally throws
+a `MapperException`. The **global defaults** feature lets you configure fallback values so that missing
+fields are filled in automatically.
+
+Add these options to your `build.yaml`:
+
+```yaml
+global_options:
+  dart_mappable_builder:
+    options:
+      # enable global defaults for missing required fields
+      useGlobalDefaultsOnMissing: true
+      # preferred enum constant name to use as default (optional, defaults to 'none')
+      enumFallbackValue: none
+      # default values per type
+      globalDefaults:
+        String: ""
+        int: 0
+        double: 0.0
+        num: 0
+        bool: false
+        List: []
+        Map: {}
+```
+
+Or configure per-library using the `@MappableLib` annotation:
+
+```dart
+@MappableLib(
+  useGlobalDefaultsOnMissing: true,
+  enumFallbackValue: 'none',
+  globalDefaults: {
+    'String': '',
+    'int': 0,
+    'double': 0.0,
+    'bool': false,
+  },
+)
+library;
+```
+
+#### How defaults are resolved
+
+For each **required, non-nullable** field without an explicit default:
+
+| Field type | Default value |
+|---|---|
+| Primitive (`String`, `int`, `double`, `bool`, `num`) | From `globalDefaults` |
+| `List`, `Map`, `Set` | From `globalDefaults` |
+| Enum | Prefers constant matching `enumFallbackValue` (default: `none`), otherwise first constant |
+| `@MappableClass` type | Recursively builds a `const` constructor using defaults for each required param |
+| Nullable type | `null` (no config needed) |
+| Other types (`DateTime`, `Uri`, etc.) | No default - make these nullable or provide an explicit constructor default |
+
+#### `enumFallbackValue`
+
+Controls which enum constant name is preferred as the default when a required enum field is missing:
+
+```yaml
+enumFallbackValue: none     # uses MyEnum.none if it exists, otherwise first constant
+enumFallbackValue: unknown  # uses MyEnum.unknown if it exists, otherwise first constant
+```
+
+If the specified constant doesn't exist in a particular enum, the first declared constant is used as
+the fallback.
+
+#### Example
+
+```dart
+enum Status { none, active, inactive }
+
+@MappableClass()
+class UserData with UserDataMappable {
+  final String name;
+  const UserData({required this.name});
+}
+
+@MappableClass()
+class Order with OrderMappable {
+  final String id;
+  final Status status;
+  final UserData user;
+  const Order({required this.id, required this.status, required this.user});
+}
+```
+
+With the configuration above, decoding incomplete JSON:
+
+```dart
+final order = OrderMapper.fromMap({'id': 'ORD-1'});
+// order.id == 'ORD-1'                     (from JSON)
+// order.status == Status.none              (enum fallback)
+// order.user == UserData(name: '')         (recursive const default)
+```
+
+Fields that already have explicit defaults in the constructor are not affected - explicit defaults
+always take precedence over global defaults.
+
 ### `build_extensions`
 
 The `build_extensions` option allows you to specify custom paths for the generated files. This is particularly useful when working with certain code generation scenarios. It takes a map where keys are paths to source files and values are lists of corresponding generated file paths.
