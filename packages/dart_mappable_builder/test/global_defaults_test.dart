@@ -25,14 +25,28 @@ class _DecodeMatcher extends Matcher {
 
   @override
   Description describe(Description description) => _inner.describe(description);
-  
+
   @override
-  Description describeMismatch(dynamic item, Description mismatchDescription,
-      Map matchState, bool verbose) {
+  Description describeMismatch(
+    dynamic item,
+    Description mismatchDescription,
+    Map matchState,
+    bool verbose,
+  ) {
     if (item is List<int>) {
-      return _inner.describeMismatch(String.fromCharCodes(item), mismatchDescription, matchState, verbose);
+      return _inner.describeMismatch(
+        String.fromCharCodes(item),
+        mismatchDescription,
+        matchState,
+        verbose,
+      );
     }
-    return _inner.describeMismatch(item, mismatchDescription, matchState, verbose);
+    return _inner.describeMismatch(
+      item,
+      mismatchDescription,
+      matchState,
+      verbose,
+    );
   }
 }
 
@@ -55,7 +69,7 @@ void main() {
 
       final reader = TestReaderWriter(rootPackage: 'models');
       await reader.testing.loadIsolateSources();
-      
+
       await testBuilder(
         MappableBuilder(BuilderOptions(options)),
         {
@@ -78,14 +92,16 @@ void main() {
           ''',
         },
         outputs: {
-          'models|lib/model.mapper.dart': decoded(allOf([
-            contains("Field('a', _\$a, def: r'')"),
-            contains("Field('b', _\$b, def: 0)"),
-            contains("Field('c', _\$c, def: 0.0)"),
-            contains("Field('d', _\$d, def: false)"),
-            contains("Field('e', _\$e, def: [])"),
-            contains("Field('f', _\$f, def: {})"),
-          ])),
+          'models|lib/model.mapper.dart': decoded(
+            allOf([
+              contains("Field('a', _\$a, def: r'')"),
+              contains("Field('b', _\$b, def: 0)"),
+              contains("Field('c', _\$c, def: 0.0)"),
+              contains("Field('d', _\$d, def: false)"),
+              contains("Field('e', _\$e, def: [])"),
+              contains("Field('f', _\$f, def: {})"),
+            ]),
+          ),
         },
         readerWriter: reader,
       );
@@ -94,7 +110,7 @@ void main() {
     test('generates correct defaults from annotation', () async {
       final reader = TestReaderWriter(rootPackage: 'models');
       await reader.testing.loadIsolateSources();
-      
+
       await testBuilder(
         MappableBuilder(BuilderOptions({})),
         {
@@ -122,10 +138,12 @@ void main() {
           ''',
         },
         outputs: {
-          'models|lib/model.mapper.dart': decoded(allOf([
-            contains("Field('a', _\$a, def: r'default')"),
-            contains("Field('b', _\$b, def: 42)"),
-          ])),
+          'models|lib/model.mapper.dart': decoded(
+            allOf([
+              contains("Field('a', _\$a, def: r'default')"),
+              contains("Field('b', _\$b, def: 42)"),
+            ]),
+          ),
         },
         readerWriter: reader,
       );
@@ -134,7 +152,7 @@ void main() {
     test('generates no defaults when disabled', () async {
       final reader = TestReaderWriter(rootPackage: 'models');
       await reader.testing.loadIsolateSources();
-      
+
       await testBuilder(
         MappableBuilder(BuilderOptions({'useGlobalDefaultsOnMissing': false})),
         {
@@ -152,7 +170,198 @@ void main() {
           ''',
         },
         outputs: {
-          'models|lib/model.mapper.dart': decoded(isNot(contains("def:")))
+          'models|lib/model.mapper.dart': decoded(isNot(contains('def:'))),
+        },
+        readerWriter: reader,
+      );
+    });
+
+    test('generates const defaults for custom @MappableClass types', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-', 'int': 0},
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            @MappableClass()
+            class UserData with UserDataMappable {
+              final String userId;
+              final String dummyValue;
+
+              UserData(this.userId, this.dummyValue);
+            }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final String name;
+              final UserData userData;
+
+              Model(this.name, this.userData);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            allOf([
+              contains("def: r'-'"),
+              contains("def: const UserData(r'-', r'-')"),
+            ]),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
+    test(
+      'generates const defaults for nested custom @MappableClass types',
+      () async {
+        var options = {
+          'useGlobalDefaultsOnMissing': true,
+          'globalDefaults': {'String': '-', 'int': 0},
+        };
+
+        final reader = TestReaderWriter(rootPackage: 'models');
+        await reader.testing.loadIsolateSources();
+
+        await testBuilder(
+          MappableBuilder(BuilderOptions(options)),
+          {
+            'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            @MappableClass()
+            class Inner with InnerMappable {
+              final String value;
+              Inner(this.value);
+            }
+
+            @MappableClass()
+            class Outer with OuterMappable {
+              final Inner inner;
+              final int count;
+              Outer(this.inner, this.count);
+            }
+
+            @MappableClass()
+            class Root with RootMappable {
+              final Outer outer;
+              final String label;
+              Root(this.outer, this.label);
+            }
+          ''',
+          },
+          outputs: {
+            'models|lib/model.mapper.dart': decoded(
+              allOf([
+                // Inner's `value` field gets String default
+                contains("def: r'-'"),
+                // Outer's `inner` field gets a const Inner default
+                contains("def: const Inner(r'-')"),
+                // Root's `outer` field gets a nested const Outer default
+                contains("def: const Outer(const Inner(r'-'), 0)"),
+              ]),
+            ),
+          },
+          readerWriter: reader,
+        );
+      },
+    );
+
+    test(
+      'skips custom class default when required param has no default',
+      () async {
+        var options = {
+          'useGlobalDefaultsOnMissing': true,
+          'globalDefaults': {'String': '-'},
+        };
+
+        final reader = TestReaderWriter(rootPackage: 'models');
+        await reader.testing.loadIsolateSources();
+
+        await testBuilder(
+          MappableBuilder(BuilderOptions(options)),
+          {
+            'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            @MappableClass()
+            class NoDefault with NoDefaultMappable {
+              final String name;
+              final DateTime created;
+              NoDefault(this.name, this.created);
+            }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final String label;
+              final NoDefault data;
+              Model(this.label, this.data);
+            }
+          ''',
+          },
+          outputs: {
+            'models|lib/model.mapper.dart': decoded(
+              allOf([
+                contains("def: r'-'"),
+                // NoDefault can't be auto-generated because DateTime has no global default
+                isNot(contains('def: const NoDefault')),
+              ]),
+            ),
+          },
+          readerWriter: reader,
+        );
+      },
+    );
+
+    test('generates custom class defaults with named parameters', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-', 'int': 0},
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            @MappableClass()
+            class Config with ConfigMappable {
+              final String host;
+              final int port;
+              Config({required this.host, required this.port});
+            }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final Config config;
+              Model(this.config);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            contains("def: const Config(host: r'-', port: 0)"),
+          ),
         },
         readerWriter: reader,
       );
@@ -161,14 +370,12 @@ void main() {
     test('explicit defaults take precedence', () async {
       var options = {
         'useGlobalDefaultsOnMissing': true,
-        'globalDefaults': {
-          'String': 'global',
-        },
+        'globalDefaults': {'String': 'global'},
       };
 
       final reader = TestReaderWriter(rootPackage: 'models');
       await reader.testing.loadIsolateSources();
-      
+
       await testBuilder(
         MappableBuilder(BuilderOptions(options)),
         {
@@ -186,12 +393,14 @@ void main() {
           ''',
         },
         outputs: {
-          'models|lib/model.mapper.dart': decoded(allOf([
-            contains("'a'"),
-            contains("_\$a"),
-            contains("opt: true"),
-            contains("def: 'explicit'"),
-          ])),
+          'models|lib/model.mapper.dart': decoded(
+            allOf([
+              contains("'a'"),
+              contains('_\$a'),
+              contains('opt: true'),
+              contains("def: 'explicit'"),
+            ]),
+          ),
         },
         readerWriter: reader,
       );
