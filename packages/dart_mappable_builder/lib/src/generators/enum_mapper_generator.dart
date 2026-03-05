@@ -53,6 +53,13 @@ class EnumMapperGenerator extends MapperGenerator<TargetEnumMapperElement> {
     if (element.defaultValue != null) {
       return 'return ${element.prefixedClassName}.values[${element.defaultValue}];';
     }
+    var fallbackName = element.options.enumFallbackValue;
+    if (fallbackName != null) {
+      var match = element.fields.indexWhere((f) => f.name == fallbackName);
+      if (match != -1) {
+        return 'return ${element.prefixedClassName}.values[$match];';
+      }
+    }
     return 'throw MapperException.unknownEnumValue(value);';
   }
 }

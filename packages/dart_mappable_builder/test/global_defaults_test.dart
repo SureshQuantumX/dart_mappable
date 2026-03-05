@@ -726,5 +726,68 @@ void main() {
         readerWriter: reader,
       );
     });
+
+    test('enum decoder uses enumFallbackValue for unknown values', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'enumFallbackValue': 'unknown',
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            @MappableEnum()
+            enum MfType { unknown, lumpsum, sip, redemption }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            allOf([
+              contains('return MfType.values[0]'),
+              isNot(contains('throw MapperException.unknownEnumValue')),
+            ]),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
+    test('enum decoder throws when enumFallbackValue not found in enum', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'enumFallbackValue': 'unknown',
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            @MappableEnum()
+            enum MfType { lumpsum, sip, redemption }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            contains('throw MapperException.unknownEnumValue'),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
   });
 }
