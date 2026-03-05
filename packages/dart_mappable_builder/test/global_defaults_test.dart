@@ -3,7 +3,6 @@ import 'package:build_test/build_test.dart';
 import 'package:dart_mappable_builder/src/builders/mappable_builder.dart';
 import 'package:build/build.dart';
 
-import 'utils/test_mappable.dart';
 
 class _DecodeMatcher extends Matcher {
   final Matcher _inner;
