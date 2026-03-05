@@ -59,6 +59,11 @@ class EnumMapperGenerator extends MapperGenerator<TargetEnumMapperElement> {
       if (match != -1) {
         return 'return ${element.prefixedClassName}.values[$match];';
       }
+      print(
+        '[WARNING] Enum \'${element.className}\' does not have a \'$fallbackName\' value. '
+        'Add \'${element.className}.$fallbackName\' to handle unknown values gracefully, '
+        'otherwise the mapper will throw on unrecognized values.',
+      );
     }
     return 'throw MapperException.unknownEnumValue(value);';
   }
