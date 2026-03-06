@@ -95,8 +95,10 @@ global_options:
     options:
       # enable global defaults for missing required fields
       useGlobalDefaultsOnMissing: true
-      # preferred enum constant name to use as default (optional, defaults to 'none')
-      enumFallbackValue: none
+      # enum constant name to use when a required enum field is missing from JSON
+      enumKeyMissingDefaultValue: 'none'
+      # enum constant name to use when a JSON value doesn't match any enum constant
+      enumFallbackValue: 'unknown'
       # default values per type
       globalDefaults:
         String: ""
@@ -113,7 +115,8 @@ Or configure per-library using the `@MappableLib` annotation:
 ```dart
 @MappableLib(
   useGlobalDefaultsOnMissing: true,
-  enumFallbackValue: 'none',
+  enumKeyMissingDefaultValue: 'none',
+  enumFallbackValue: 'unknown',
   globalDefaults: {
     'String': '',
     'int': 0,
@@ -132,27 +135,58 @@ For each **required, non-nullable** field without an explicit default:
 |---|---|
 | Primitive (`String`, `int`, `double`, `bool`, `num`) | From `globalDefaults` |
 | `List`, `Map`, `Set` | From `globalDefaults` |
-| Enum | Prefers constant matching `enumFallbackValue` (default: `none`), otherwise first constant |
+| Enum | Uses `enumKeyMissingDefaultValue` from config first, then `@MappableEnum(defaultValue:)`. No default if neither is set. |
 | `@MappableClass` type | Recursively builds a `const` constructor using defaults for each required param |
 | Nullable type | `null` (no config needed) |
-| Other types (`DateTime`, `Uri`, etc.) | No default - make these nullable or provide an explicit constructor default |
+| Other types (`DateTime`, `Uri`, etc.) | No default — make these nullable or provide an explicit constructor default |
 
-#### `enumFallbackValue`
+Fields that already have explicit defaults in the constructor are not affected — explicit defaults
+always take precedence over global defaults.
 
-Controls which enum constant name is preferred as the default when a required enum field is missing:
+#### Enum handling
+
+There are two separate concerns for enums:
+
+- **Missing field** — the JSON key is absent entirely (e.g., `{"amount": 100}` with no `mfType` key)
+- **Unknown value** — the JSON key is present but the value doesn't match any enum constant (e.g., `{"mfType": "nfo"}`)
+
+##### `enumKeyMissingDefaultValue` — field missing from JSON
+
+Controls which enum constant to use when a required enum field is **absent** from the JSON.
+
+Priority order:
+1. `enumKeyMissingDefaultValue` from build.yaml / `@MappableLib` (highest)
+2. `@MappableEnum(defaultValue: X)` annotation on the enum
+3. No default — field remains required, throws if missing
 
 ```yaml
-enumFallbackValue: none     # uses MyEnum.none if it exists, otherwise first constant
-enumFallbackValue: unknown  # uses MyEnum.unknown if it exists, otherwise first constant
+enumKeyMissingDefaultValue: 'none'     # uses MyEnum.none if it exists
+enumKeyMissingDefaultValue: 'unknown'  # uses MyEnum.unknown if it exists
 ```
 
-If the specified constant doesn't exist in a particular enum, the first declared constant is used as
-the fallback.
+If the specified constant doesn't exist in a particular enum, no default is generated.
+
+##### `enumFallbackValue` — unknown value in JSON
+
+Controls which enum constant to use when the JSON contains a value that **doesn't match** any
+enum constant (e.g., receiving `"nfo"` when the enum only has `lumpsum`, `sip`, etc.).
+
+Priority order:
+1. `@MappableEnum(defaultValue: X)` annotation on the enum (highest)
+2. `enumFallbackValue` from build.yaml / `@MappableLib`
+3. No fallback — throws `MapperException` for unknown values
+
+```yaml
+enumFallbackValue: 'unknown'  # uses MyEnum.unknown for unrecognized values
+```
+
+If the specified constant doesn't exist in a particular enum, a build warning is emitted and
+decoding will throw a `MapperException` for unknown values.
 
 #### Example
 
 ```dart
-enum Status { none, active, inactive }
+enum Status { none, unknown, active, inactive }
 
 @MappableClass()
 class UserData with UserDataMappable {
@@ -169,17 +203,36 @@ class Order with OrderMappable {
 }
 ```
 
-With the configuration above, decoding incomplete JSON:
+With the configuration above, decoding incomplete or unexpected JSON:
 
 ```dart
+// Missing field — uses enumKeyMissingDefaultValue ('none')
 final order = OrderMapper.fromMap({'id': 'ORD-1'});
 // order.id == 'ORD-1'                     (from JSON)
-// order.status == Status.none              (enum fallback)
-// order.user == UserData(name: '')         (recursive const default)
+// order.status == Status.none             (field missing → enumKeyMissingDefaultValue)
+// order.user == UserData(name: '')        (recursive const default)
+
+// Unknown value — uses enumFallbackValue ('unknown')
+final order2 = OrderMapper.fromMap({'id': 'ORD-2', 'status': 'archived'});
+// order2.status == Status.unknown         (value unrecognized → enumFallbackValue)
 ```
 
-Fields that already have explicit defaults in the constructor are not affected - explicit defaults
-always take precedence over global defaults.
+#### Enum without matching constants
+
+If the enum does **not** have the configured constant (e.g., enum has no `none` or `unknown`):
+
+```dart
+enum Priority { low, medium, high }
+```
+
+- Missing field → **throws** (no `none` constant to match `enumKeyMissingDefaultValue`)
+- Unknown value → **throws** + build warning (no `unknown` constant to match `enumFallbackValue`)
+
+To handle this, either:
+- Add `none` / `unknown` constants to the enum
+- Use `@MappableEnum(defaultValue: Priority.low)` to set a default using an existing constant
+- Use a constructor default: `{this.priority = Priority.low}`
+- Make the field nullable: `final Priority? priority`
 
 ### `build_extensions`
 
