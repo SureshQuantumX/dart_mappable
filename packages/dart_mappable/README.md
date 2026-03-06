@@ -303,47 +303,36 @@ The builder resolves defaults for each **required, non-nullable** field using th
 
 There are two separate concerns for enums:
 
-- **Missing field** — the JSON key is absent entirely (e.g., `{"amount": 100}` with no `mfType` key)
-- **Unknown value** — the JSON key is present but the value doesn't match any enum constant (e.g., `{"mfType": "nfo"}`)
+- **Missing field** — the JSON key is absent entirely (e.g., `{"amount": 100}` with no `status` key)
+- **Unknown value** — the JSON key is present but the value doesn't match any enum constant (e.g., `{"status": "archived"}`)
 
 #### Priority order for missing fields
 
 | Priority | Source | Example |
 |---|---|---|
 | 1 (highest) | `enumKeyMissingDefaultValue` from build.yaml / `@MappableLib` | `enumKeyMissingDefaultValue: 'none'` |
-| 2 | `@MappableEnum(defaultValue: X)` annotation | `@MappableEnum(defaultValue: MfType.sip)` |
+| 2 | `@MappableEnum(defaultValue: X)` annotation | `@MappableEnum(defaultValue: Status.inactive)` |
 | 3 | No default — field remains required | Throws `MapperException` if missing |
 
 #### Priority order for unknown values
 
 | Priority | Source | Example |
 |---|---|---|
-| 1 (highest) | `@MappableEnum(defaultValue: X)` annotation | `@MappableEnum(defaultValue: MfType.sip)` |
+| 1 (highest) | `@MappableEnum(defaultValue: X)` annotation | `@MappableEnum(defaultValue: Status.inactive)` |
 | 2 | `enumFallbackValue` from build.yaml / `@MappableLib` | `enumFallbackValue: 'unknown'` |
 | 3 | No fallback — throws exception | Throws `MapperException` for unknown values |
 
 #### Scenario 1: Enum without annotation or config — no default
 
 ```dart
-@MappableEnum(caseStyle: CaseStyle.lowerCase)
-enum MfType {
-  lumpsum,
-  sip,
-  redemption;
-
-  String get label => switch (this) {
-    MfType.lumpsum => 'Lumpsum',
-    MfType.sip => 'SIP',
-    MfType.redemption => 'Redemption',
-  };
-}
+enum Status { active, inactive, pending }
 ```
 
 | Situation | Input JSON | Result |
 |---|---|---|
 | Field missing | `{"name": "A"}` | Throws — no default configured |
-| Known value | `{"name": "A", "mfType": "lumpsum"}` | `MfType.lumpsum` |
-| Unknown value | `{"name": "A", "mfType": "nfo"}` | Throws — no fallback configured |
+| Known value | `{"name": "A", "status": "active"}` | `Status.active` |
+| Unknown value | `{"name": "A", "status": "archived"}` | Throws — no fallback configured |
 
 #### Scenario 2: Enum with `@MappableEnum(defaultValue:)` and build.yaml config
 
@@ -358,56 +347,30 @@ enumKeyMissingDefaultValue: 'none'
 ```
 
 ```dart
-@MappableEnum(caseStyle: CaseStyle.lowerCase, defaultValue: MfType.unknown)
-enum MfType {
-  none,
-  unknown,
-  lumpsum,
-  sip,
-  redemption;
-
-  String get label => switch (this) {
-    MfType.none => 'None',
-    MfType.unknown => 'Unknown',
-    MfType.lumpsum => 'Lumpsum',
-    MfType.sip => 'SIP',
-    MfType.redemption => 'Redemption',
-  };
-}
+@MappableEnum(defaultValue: Status.unknown)
+enum Status { none, unknown, active, inactive }
 ```
 
 | Situation | Input JSON | Result |
 |---|---|---|
-| Field missing | `{"name": "A"}` | `MfType.none` — from `enumKeyMissingDefaultValue` (wins over annotation) |
-| Known value | `{"name": "A", "mfType": "lumpsum"}` | `MfType.lumpsum` |
-| Unknown value | `{"name": "A", "mfType": "nfo"}` | `MfType.unknown` — from annotation `defaultValue` |
+| Field missing | `{"name": "A"}` | `Status.none` — from `enumKeyMissingDefaultValue` (wins over annotation) |
+| Known value | `{"name": "A", "status": "active"}` | `Status.active` |
+| Unknown value | `{"name": "A", "status": "archived"}` | `Status.unknown` — from annotation `defaultValue` |
 
 If `enumKeyMissingDefaultValue` is **not** configured, the annotation's `defaultValue` is used for missing fields too.
 
 #### Scenario 2b: Enum with `@MappableEnum(defaultValue:)` only — no build.yaml config
 
 ```dart
-@MappableEnum(caseStyle: CaseStyle.lowerCase, defaultValue: MfType.unknown)
-enum MfType {
-  unknown,
-  lumpsum,
-  sip,
-  redemption;
-
-  String get label => switch (this) {
-    MfType.unknown => 'Unknown',
-    MfType.lumpsum => 'Lumpsum',
-    MfType.sip => 'SIP',
-    MfType.redemption => 'Redemption',
-  };
-}
+@MappableEnum(defaultValue: Status.unknown)
+enum Status { unknown, active, inactive }
 ```
 
 | Situation | Input JSON | Result |
 |---|---|---|
-| Field missing | `{"name": "A"}` | `MfType.unknown` — from annotation (no build.yaml config to override) |
-| Known value | `{"name": "A", "mfType": "lumpsum"}` | `MfType.lumpsum` |
-| Unknown value | `{"name": "A", "mfType": "nfo"}` | `MfType.unknown` — from annotation |
+| Field missing | `{"name": "A"}` | `Status.unknown` — from annotation (no build.yaml config to override) |
+| Known value | `{"name": "A", "status": "active"}` | `Status.active` |
+| Unknown value | `{"name": "A", "status": "archived"}` | `Status.unknown` — from annotation |
 
 #### Scenario 3: No annotation, but build.yaml configured
 
@@ -419,29 +382,14 @@ enumFallbackValue: 'unknown'
 ```
 
 ```dart
-@MappableEnum(caseStyle: CaseStyle.lowerCase)
-enum MfType {
-  none,
-  unknown,
-  lumpsum,
-  sip,
-  redemption;
-
-  String get label => switch (this) {
-    MfType.none => 'None',
-    MfType.unknown => 'Unknown',
-    MfType.lumpsum => 'Lumpsum',
-    MfType.sip => 'SIP',
-    MfType.redemption => 'Redemption',
-  };
-}
+enum Status { none, unknown, active, inactive }
 ```
 
 | Situation | Input JSON | Result |
 |---|---|---|
-| Field missing | `{"name": "A"}` | `MfType.none` — from `enumKeyMissingDefaultValue` |
-| Known value | `{"name": "A", "mfType": "lumpsum"}` | `MfType.lumpsum` |
-| Unknown value | `{"name": "A", "mfType": "nfo"}` | `MfType.unknown` — from `enumFallbackValue` |
+| Field missing | `{"name": "A"}` | `Status.none` — from `enumKeyMissingDefaultValue` |
+| Known value | `{"name": "A", "status": "active"}` | `Status.active` |
+| Unknown value | `{"name": "A", "status": "archived"}` | `Status.unknown` — from `enumFallbackValue` |
 
 **Important:** If the enum does **not** have a constant matching the configured name (e.g., enum has no `none` constant but `enumKeyMissingDefaultValue: 'none'` is set), no default is generated and the field remains required.
 
@@ -460,14 +408,14 @@ class UserData with UserDataMappable {
 class Order with OrderMappable {
   final String id;
   final double amount;
-  final MfType mfType;        // non-nullable enum
-  final MfType? cancelReason; // nullable — defaults to null
+  final Status status;        // non-nullable enum
+  final Status? cancelReason; // nullable — defaults to null
   final UserData userData;    // nested custom class
 
   const Order({
     required this.id,
     required this.amount,
-    required this.mfType,
+    required this.status,
     this.cancelReason,
     required this.userData,
   });
@@ -478,14 +426,121 @@ class Order with OrderMappable {
 // Missing field — uses enumKeyMissingDefaultValue ('none')
 final json = {'id': 'ORD-1', 'amount': 500.0};
 final order = OrderMapper.fromMap(json);
-// order.mfType == MfType.none                     (field missing → enumKeyMissingDefaultValue)
+// order.status == Status.none                     (field missing → enumKeyMissingDefaultValue)
 // order.userData == UserData(userId: '', name: '') (recursive const default)
 
 // Unknown value — uses enumFallbackValue ('unknown')
-final json2 = {'id': 'ORD-2', 'amount': 300.0, 'mfType': 'nfo'};
+final json2 = {'id': 'ORD-2', 'amount': 300.0, 'status': 'archived'};
 final order2 = OrderMapper.fromMap(json2);
-// order2.mfType == MfType.unknown                 (value unrecognized → enumFallbackValue)
+// order2.status == Status.unknown                 (value unrecognized → enumFallbackValue)
 ```
+
+## Global Defaults
+
+When backend APIs return incomplete JSON, required fields cause a `MapperException`. The **global defaults**
+feature lets you configure fallback values automatically.
+
+```yaml
+# build.yaml
+global_options:
+  dart_mappable_builder:
+    options:
+      useGlobalDefaultsOnMissing: true
+      enumKeyMissingDefaultValue: 'none'     # default enum constant when field is missing from JSON
+      enumFallbackValue: 'unknown'           # fallback enum constant when JSON value is unknown
+      globalDefaults:
+        String: ""
+        int: 0
+        double: 0.0
+        num: 0
+        bool: false
+        List: []
+        Map: {}
+```
+
+### Enum handling
+
+There are two separate concerns for enums:
+
+- **Missing field** — the JSON key is absent entirely
+- **Unknown value** — the JSON key is present but the value doesn't match any enum constant
+
+#### Priority order
+
+**Missing field:**
+
+| Priority | Source |
+|---|---|
+| 1 (highest) | `enumKeyMissingDefaultValue` from build.yaml |
+| 2 | `@MappableEnum(defaultValue: X)` annotation |
+| 3 | No default — throws |
+
+**Unknown value:**
+
+| Priority | Source |
+|---|---|
+| 1 (highest) | `@MappableEnum(defaultValue: X)` annotation |
+| 2 | `enumFallbackValue` from build.yaml |
+| 3 | No fallback — throws |
+
+#### Scenario 1: Enum without annotation or config — no default
+
+```dart
+enum Status { active, inactive, pending }
+```
+
+| Situation | Result |
+|---|---|
+| Field missing | Throws — no default configured |
+| Unknown value | Throws — no fallback configured |
+
+#### Scenario 2: Enum with `@MappableEnum(defaultValue:)` and build.yaml config
+
+```yaml
+enumKeyMissingDefaultValue: 'none'
+```
+
+```dart
+@MappableEnum(defaultValue: Status.unknown)
+enum Status { none, unknown, active, inactive }
+```
+
+| Situation | Result |
+|---|---|
+| Field missing | `Status.none` — from `enumKeyMissingDefaultValue` (wins over annotation) |
+| Unknown value | `Status.unknown` — from annotation `defaultValue` |
+
+#### Scenario 2b: Enum with `@MappableEnum(defaultValue:)` only
+
+```dart
+@MappableEnum(defaultValue: Status.unknown)
+enum Status { unknown, active, inactive }
+```
+
+| Situation | Result |
+|---|---|
+| Field missing | `Status.unknown` — from annotation (no build.yaml config to override) |
+| Unknown value | `Status.unknown` — from annotation |
+
+#### Scenario 3: No annotation, but build.yaml configured
+
+```yaml
+enumKeyMissingDefaultValue: 'none'
+enumFallbackValue: 'unknown'
+```
+
+```dart
+enum Status { none, unknown, active, inactive }
+```
+
+| Situation | Result |
+|---|---|
+| Field missing | `Status.none` — from `enumKeyMissingDefaultValue` |
+| Unknown value | `Status.unknown` — from `enumFallbackValue` |
+
+**Note:** The enum must have a constant matching the configured name. If not, no default is generated and the field remains required.
+
+For more details, see the [Configuration](https://pub.dev/documentation/dart_mappable/latest/topics/Configuration-topic.html) docs.
 
 ## Full Documentation
 
