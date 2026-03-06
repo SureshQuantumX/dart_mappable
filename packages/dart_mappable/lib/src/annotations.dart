@@ -230,7 +230,7 @@ class MappableLib {
     this.generateInitializerForScope,
     this.useGlobalDefaultsOnMissing,
     this.globalDefaults,
-    this.enumMissingValue,
+    this.enumKeyMissingDefaultValue,
     this.enumFallbackValue,
   });
 
@@ -261,10 +261,10 @@ class MappableLib {
   final Map<String, dynamic>? globalDefaults;
 
   /// The enum constant name to use as the default value when a required enum
-  /// field is missing from JSON. If the enum has a constant with this name,
-  /// it will be used. Otherwise falls back to the first constant.
-  /// Defaults to 'none' when [useGlobalDefaultsOnMissing] is true.
-  final String? enumMissingValue;
+  /// field is missing from JSON. This takes priority over
+  /// `@MappableEnum(defaultValue:)` for missing fields. If neither is set,
+  /// no default is generated.
+  final String? enumKeyMissingDefaultValue;
 
   /// The enum constant name to use as fallback when a JSON value doesn't match
   /// any enum constant (e.g., receiving "nfo" when the enum only has

@@ -405,7 +405,7 @@ void main() {
       );
     });
 
-    test('generates default for enum types using first value', () async {
+    test('does not generate default for enum types without config', () async {
       var options = {
         'useGlobalDefaultsOnMissing': true,
         'globalDefaults': {'String': '-'},
@@ -437,7 +437,7 @@ void main() {
           'models|lib/model.mapper.dart': decoded(
             allOf([
               contains("def: r'-'"),
-              contains('def: Status.active'),
+              isNot(contains('def: Status')),
             ]),
           ),
         },
@@ -445,7 +445,7 @@ void main() {
       );
     });
 
-    test('generates enum default inside custom class default', () async {
+    test('skips custom class default when enum field has no default', () async {
       var options = {
         'useGlobalDefaultsOnMissing': true,
         'globalDefaults': {'String': '-', 'int': 0},
@@ -482,17 +482,18 @@ void main() {
         },
         outputs: {
           'models|lib/model.mapper.dart': decoded(
-            contains("def: const Task(title: r'-', priority: Priority.low)"),
+            isNot(contains('def: const Task')),
           ),
         },
         readerWriter: reader,
       );
     });
 
-    test('prefers none enum value as default when available', () async {
+    test('uses enumKeyMissingDefaultValue none when configured', () async {
       var options = {
         'useGlobalDefaultsOnMissing': true,
         'globalDefaults': {'String': '-'},
+        'enumKeyMissingDefaultValue': 'none',
       };
 
       final reader = TestReaderWriter(rootPackage: 'models');
@@ -526,10 +527,11 @@ void main() {
       );
     });
 
-    test('prefers none enum value inside custom class default', () async {
+    test('uses enumKeyMissingDefaultValue none inside custom class default', () async {
       var options = {
         'useGlobalDefaultsOnMissing': true,
         'globalDefaults': {'String': '-'},
+        'enumKeyMissingDefaultValue': 'none',
       };
 
       final reader = TestReaderWriter(rootPackage: 'models');
@@ -610,11 +612,11 @@ void main() {
       );
     });
 
-    test('uses configurable enumMissingValue from build.yaml', () async {
+    test('uses configurable enumKeyMissingDefaultValue from build.yaml', () async {
       var options = {
         'useGlobalDefaultsOnMissing': true,
         'globalDefaults': {'String': '-'},
-        'enumMissingValue': 'unknown',
+        'enumKeyMissingDefaultValue': 'unknown',
       };
 
       final reader = TestReaderWriter(rootPackage: 'models');
@@ -688,11 +690,11 @@ void main() {
       );
     });
 
-    test('falls back to first constant when enumMissingValue not found', () async {
+    test('no default when enumKeyMissingDefaultValue not found in enum', () async {
       var options = {
         'useGlobalDefaultsOnMissing': true,
         'globalDefaults': {'String': '-'},
-        'enumMissingValue': 'unknown',
+        'enumKeyMissingDefaultValue': 'unknown',
       };
 
       final reader = TestReaderWriter(rootPackage: 'models');
@@ -719,7 +721,7 @@ void main() {
         },
         outputs: {
           'models|lib/model.mapper.dart': decoded(
-            contains('def: Status.active'),
+            isNot(contains('def: Status')),
           ),
         },
         readerWriter: reader,
@@ -789,11 +791,11 @@ void main() {
       );
     });
 
-    test('enumMissingValue and enumFallbackValue work independently', () async {
+    test('enumKeyMissingDefaultValue and enumFallbackValue work independently', () async {
       var options = {
         'useGlobalDefaultsOnMissing': true,
         'globalDefaults': {'String': '-'},
-        'enumMissingValue': 'none',
+        'enumKeyMissingDefaultValue': 'none',
         'enumFallbackValue': 'unknown',
       };
 
@@ -823,7 +825,7 @@ void main() {
         outputs: {
           'models|lib/model.mapper.dart': decoded(
             allOf([
-              // Missing field default uses enumMissingValue ('none')
+              // Missing field default uses enumKeyMissingDefaultValue ('none')
               contains('def: MfType.none'),
               // Unknown value decoder uses enumFallbackValue ('unknown') — index 1
               contains('return MfType.values[1]'),
@@ -835,11 +837,93 @@ void main() {
       );
     });
 
+    test('enumKeyMissingDefaultValue takes priority over annotation defaultValue for missing fields', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-'},
+        'enumKeyMissingDefaultValue': 'inactive',
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            @MappableEnum(defaultValue: Status.pending)
+            enum Status { active, inactive, pending }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final String name;
+              final Status status;
+
+              Model(this.name, this.status);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            allOf([
+              // Missing field uses enumKeyMissingDefaultValue ('inactive'), not annotation ('pending')
+              contains('def: Status.inactive'),
+              // Decoder default still uses annotation defaultValue ('pending') for unknown values
+              contains('return Status.values[2]'),
+            ]),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
+    test('annotation defaultValue used for missing field when no enumKeyMissingDefaultValue configured', () async {
+      var options = {
+        'useGlobalDefaultsOnMissing': true,
+        'globalDefaults': {'String': '-'},
+      };
+
+      final reader = TestReaderWriter(rootPackage: 'models');
+      await reader.testing.loadIsolateSources();
+
+      await testBuilder(
+        MappableBuilder(BuilderOptions(options)),
+        {
+          'models|lib/model.dart': '''
+            import 'package:dart_mappable/dart_mappable.dart';
+
+            part 'model.mapper.dart';
+
+            @MappableEnum(defaultValue: Status.pending)
+            enum Status { active, inactive, pending }
+
+            @MappableClass()
+            class Model with ModelMappable {
+              final String name;
+              final Status status;
+
+              Model(this.name, this.status);
+            }
+          ''',
+        },
+        outputs: {
+          'models|lib/model.mapper.dart': decoded(
+            contains('def: Status.pending'),
+          ),
+        },
+        readerWriter: reader,
+      );
+    });
+
     test('full scenario: snakeCase + enums + custom class with named params', () async {
       var options = {
         'caseStyle': 'snakeCase',
         'useGlobalDefaultsOnMissing': true,
-        'enumMissingValue': 'unknown',
+        'enumKeyMissingDefaultValue': 'unknown',
         'enumFallbackValue': 'unknown',
         'globalDefaults': {
           'String': '-',

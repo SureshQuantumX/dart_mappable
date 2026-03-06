@@ -373,15 +373,31 @@ var constants = element.fields.where((f) => f.isEnumConstant).toList();
 
 if (constants.isEmpty) return null;
 
-var fallbackName = parent.options.enumMissingValue ?? 'none';
-
-var preferredConstant = constants.where((f) => f.name == fallbackName).firstOrNull;
-
-var chosen = preferredConstant ?? constants.first;
-
 var className = parent.parent.prefixedType(type, withNullability: false);
 
-return '$className.${chosen.name}';
+// Priority 1: Check enumKeyMissingDefaultValue from global config.
+var fallbackName = parent.options.enumKeyMissingDefaultValue;
+if (fallbackName != null) {
+  var preferredConstant = constants.where((f) => f.name == fallbackName).firstOrNull;
+  if (preferredConstant != null) {
+    return '$className.${preferredConstant.name}';
+  }
+}
+
+// Priority 2: Check @MappableEnum(defaultValue: ...) annotation on the enum itself.
+var annotation = enumChecker.firstAnnotationOf(element);
+if (annotation != null) {
+  var defaultValueObj = annotation.getField('defaultValue');
+  if (defaultValueObj != null && !defaultValueObj.isNull) {
+    var index = defaultValueObj.getField('index')?.toIntValue();
+    if (index != null && index < constants.length) {
+      return '$className.${constants[index].name}';
+    }
+  }
+}
+
+// No default available — do not fall back to first enum value.
+return null;
 
 }
 

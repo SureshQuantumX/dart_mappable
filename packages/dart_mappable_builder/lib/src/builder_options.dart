@@ -19,7 +19,7 @@ class MappableOptions {
   final Map<String, List<String>> buildExtensions;
   final bool? useGlobalDefaultsOnMissing;
   final Map<String, dynamic>? globalDefaults;
-  final String? enumMissingValue;
+  final String? enumKeyMissingDefaultValue;
   final String? enumFallbackValue;
 
   MappableOptions({
@@ -33,7 +33,7 @@ class MappableOptions {
     this.buildExtensions = _defaultExtensions,
     this.useGlobalDefaultsOnMissing,
     this.globalDefaults,
-    this.enumMissingValue,
+    this.enumKeyMissingDefaultValue,
     this.enumFallbackValue,
   });
 
@@ -53,7 +53,7 @@ class MappableOptions {
       ),
       useGlobalDefaultsOnMissing = options['useGlobalDefaultsOnMissing'] as bool?,
       globalDefaults = toMap(options['globalDefaults'] ?? {}),
-      enumMissingValue = options['enumMissingValue'] as String?,
+      enumKeyMissingDefaultValue = options['enumKeyMissingDefaultValue'] as String?,
       enumFallbackValue = options['enumFallbackValue'] as String?;
 
   MappableOptions apply(MappableOptions? options, {bool forceJoin = true}) {
@@ -70,7 +70,7 @@ class MappableOptions {
       useGlobalDefaultsOnMissing:
           options.useGlobalDefaultsOnMissing ?? useGlobalDefaultsOnMissing,
       globalDefaults: {...?globalDefaults, ...?options.globalDefaults},
-      enumMissingValue: options.enumMissingValue ?? enumMissingValue,
+      enumKeyMissingDefaultValue: options.enumKeyMissingDefaultValue ?? enumKeyMissingDefaultValue,
       enumFallbackValue: options.enumFallbackValue ?? enumFallbackValue,
     );
   }
@@ -94,8 +94,8 @@ class MappableOptions {
           .read('globalDefaults')
           ?.toMapValue()
           ?.map((k, v) => MapEntry(k!.toStringValue()!, _toValue(v))),
-      enumMissingValue:
-          object.read('enumMissingValue')?.toStringValue(),
+      enumKeyMissingDefaultValue:
+          object.read('enumKeyMissingDefaultValue')?.toStringValue(),
       enumFallbackValue:
           object.read('enumFallbackValue')?.toStringValue(),
     );
